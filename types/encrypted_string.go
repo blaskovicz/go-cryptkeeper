@@ -1,0 +1,133 @@
+package types
+
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"database/sql/driver"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"reflect"
+)
+
+/* CryptString is a wrapper for encrypting and decrypting a string for database operations.
+It statisfies:
+- json.Marshaler
+- sql.Scanner
+- driver.Valuer
+*/
+type CryptString struct {
+	String string
+}
+
+//MarshalJSON marshals nested CryptString struct
+func (cs *CryptString) MarshalJSON() ([]byte, error) {
+	encString, err := Encrypt(cs.String)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(encString)
+}
+
+//Scan implements sql.Scanner
+//
+//Accepts nil, proxies everything else to nested CryptString
+func (cs *CryptString) Scan(value interface{}) error {
+	switch v := value.(type) {
+	case string:
+		rawString, err := Decrypt(v)
+		if err != nil {
+			return err
+		}
+		cs.String = rawString
+	case []byte:
+		rawString, err := Decrypt(string(v))
+		if err != nil {
+			return err
+		}
+		cs.String = rawString
+	default:
+		return fmt.Errorf("couldn't scan %+v", reflect.TypeOf(value))
+	}
+	return nil
+}
+
+//Value implements driver.Valuer
+func (cs CryptString) Value() (value driver.Value, err error) {
+	return Encrypt(cs.String)
+}
+
+// TODO use a package-scoped global key
+// func SetCryptKey() {}
+
+func cryptKey() ([]byte, error) {
+	key := []byte(os.Getenv("CRYPT_KEEPER_KEY"))
+	keyLen := len(key)
+	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+		return nil, fmt.Errorf("Invalid CRYPT_KEEPER_KEY; must be 16, 24, or 32 bytes (got %d)", keyLen)
+	}
+	return key, nil
+}
+
+// encrypt string to base64 crypto using AES
+func Encrypt(text string) (string, error) {
+	key, err := cryptKey()
+	if err != nil {
+		return "", err
+	}
+
+	plaintext := []byte(text)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	// The IV needs to be unique, but not secure. Therefore it's common to
+	// include it at the beginning of the ciphertext.
+	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return "", err
+	}
+
+	cipher.NewCFBEncrypter(block, iv).XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+
+	// convert to base64
+	return base64.URLEncoding.EncodeToString(ciphertext), nil
+}
+
+// decrypt from base64 to decrypted string
+func Decrypt(cryptoText string) (string, error) {
+	key, err := cryptKey()
+	if err != nil {
+		return "", err
+	}
+
+	ciphertext, err := base64.URLEncoding.DecodeString(cryptoText)
+	if err != nil {
+		return "", err
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	// The IV needs to be unique, but not secure. Therefore it's common to
+	// include it at the beginning of the ciphertext.
+	if byteLen := len(ciphertext); byteLen < aes.BlockSize {
+		return "", fmt.Errorf("invalid cipher size %d.", byteLen)
+	}
+
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+
+	// XORKeyStream can work in-place if the two arguments are the same.
+	cipher.NewCFBDecrypter(block, iv).XORKeyStream(ciphertext, ciphertext)
+
+	return string(ciphertext), nil
+}
