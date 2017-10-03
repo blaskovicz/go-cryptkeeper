@@ -23,7 +23,7 @@ type CryptString struct {
 	String string
 }
 
-//MarshalJSON marshals nested CryptString struct
+// MarshalJSON encrypts and marshals nested String
 func (cs *CryptString) MarshalJSON() ([]byte, error) {
 	encString, err := Encrypt(cs.String)
 	if err != nil {
@@ -32,9 +32,7 @@ func (cs *CryptString) MarshalJSON() ([]byte, error) {
 	return json.Marshal(encString)
 }
 
-//Scan implements sql.Scanner
-//
-//Accepts nil, proxies everything else to nested CryptString
+// Scan implements sql.Scanner and decryptes incoming sql column data
 func (cs *CryptString) Scan(value interface{}) error {
 	switch v := value.(type) {
 	case string:
@@ -55,7 +53,7 @@ func (cs *CryptString) Scan(value interface{}) error {
 	return nil
 }
 
-//Value implements driver.Valuer
+// Value implements driver.Valuer and encrypts outgoing bind values
 func (cs CryptString) Value() (value driver.Value, err error) {
 	return Encrypt(cs.String)
 }
@@ -72,7 +70,7 @@ func cryptKey() ([]byte, error) {
 	return key, nil
 }
 
-// encrypt string to base64 crypto using AES
+// AES-encrypt string and then base64-encode
 func Encrypt(text string) (string, error) {
 	key, err := cryptKey()
 	if err != nil {
@@ -100,7 +98,7 @@ func Encrypt(text string) (string, error) {
 	return base64.URLEncoding.EncodeToString(ciphertext), nil
 }
 
-// decrypt from base64 to decrypted string
+// base64-decode and then AES decrypt string
 func Decrypt(cryptoText string) (string, error) {
 	key, err := cryptKey()
 	if err != nil {
