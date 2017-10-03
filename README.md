@@ -1,4 +1,4 @@
-# go-cryptkeeper
+# go-cryptkeeper [![Build Status](https://travis-ci.org/blaskovicz/go-cryptkeeper.svg?branch=master)](https://travis-ci.org/blaskovicz/go-cryptkeeper)
 > Golang library, wrapping encryption and decryption for use as a database type and/or json.
 
 ## Install
