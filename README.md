@@ -14,7 +14,7 @@ $ go get github.com/blaskovicz/go-cryptkeeper
 ```go
 import (
   "database/sql
-  "github.com/blaskovicz/go-cryptkeeper/types"
+  "github.com/blaskovicz/go-cryptkeeper"
 )
 
 // set env variable, used for encryption, to a 16, 24, or 32 byte value
@@ -26,9 +26,9 @@ if err != nil {
 }
 
 // declare a struct for database Value
-cs := types.CryptString{"hello word"}
+cs := cryptkeeper.CryptString{"hello word"}
 
-// insert the row; uses types.Encrypt(string) under the covers.
+// insert the row; uses cryptkeeper.Encrypt(string) under the covers.
 // column type can be something like text, varchar, or bytea
 _, err = db.Exec("INSERT INTO secret_phrases(phrase) VALUES ($1)", &cs)
 if err != nil {
@@ -36,9 +36,9 @@ if err != nil {
 }
 
 // declare a struct for database Scan
-var cs2 types.CryptString
+var cs2 cryptkeeper.CryptString
 
-// select the inserted row; uses types.Decrypt(string) under the covers.
+// select the inserted row; uses cryptkeeper.Decrypt(string) under the covers.
 err = db.QueryRow("SELECT phrase FROM secret_phrases LIMIT 1").Scan(&cs2)
 if err != nil {
   panic(err)
