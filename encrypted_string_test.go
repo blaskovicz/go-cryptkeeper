@@ -1,33 +1,33 @@
 package cryptkeeper
 
 import (
-	"os"
 	"reflect"
 	"testing"
 )
 
 func TestCryptString(t *testing.T) {
 	t.Run("Crypt Key Required", func(t *testing.T) {
-		key, err := cryptKey()
-		if err == nil {
-			t.Fatalf("Crypt key should have been required.")
-		}
+		key := CryptKey()
 		if key != nil {
 			t.Fatalf("Crypt key should have been nil")
 		}
 	})
 	t.Run("Valid Crypt Key Required", func(t *testing.T) {
-		os.Setenv("CRYPT_KEEPER_KEY", "123")
-		key, err := cryptKey()
+		err := SetCryptKey([]byte("123"))
 		if err == nil {
-			t.Fatalf("Crypt key should have been required.")
+			t.Fatalf("SetCryptKey should have returned an error")
 		}
+		key := CryptKey()
 		if key != nil {
 			t.Fatalf("Crypt key should have been nil")
 		}
 	})
 	t.Run("Encrypt/Valid", func(t *testing.T) {
-		os.Setenv("CRYPT_KEEPER_KEY", "12345678901234567890123456789012")
+		err := SetCryptKey([]byte("12345678901234567890123456789012"))
+		if err != nil {
+			t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+
+		}
 		encrypted, err := Encrypt("abc")
 		if err != nil {
 			t.Fatalf("Encrypt error: %s", err)
@@ -45,7 +45,10 @@ func TestCryptString(t *testing.T) {
 		}
 	})
 	t.Run("Decrypt", func(t *testing.T) {
-		os.Setenv("CRYPT_KEEPER_KEY", "12345678901234567890123456789012")
+		err := SetCryptKey([]byte("12345678901234567890123456789012"))
+		if err != nil {
+			t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+		}
 		t.Run("Invalid", func(t *testing.T) {
 			decrypted, err := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ2d9PnQJjmN2FYIutFDFvV1h6LA==a")
 			if err == nil {
@@ -55,7 +58,23 @@ func TestCryptString(t *testing.T) {
 				t.Fatalf("Decrypt should have failed with no string, got: '%s'", decrypted)
 			}
 		})
+		t.Run("Invalid decryption with valid key", func(t *testing.T) {
+			err := SetCryptKey([]byte("32345678901234567890123456789012"))
+			if err != nil {
+				t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+			}
+
+			decrypted, _ := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ")
+			if decrypted == "how are you doing" {
+				t.Fatalf("Decrypt should not have matched 'how are you doing'")
+			}
+		})
 		t.Run("Valid", func(t *testing.T) {
+			err := SetCryptKey([]byte("12345678901234567890123456789012"))
+			if err != nil {
+				t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+			}
+
 			decrypted, err := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ")
 			if err != nil {
 				t.Fatalf("Decrypt should not have failed: %s", err)
@@ -73,7 +92,10 @@ func TestCryptString(t *testing.T) {
 		})
 	})
 	t.Run("CryptString", func(t *testing.T) {
-		os.Setenv("CRYPT_KEEPER_KEY", "12345678901234567890123456789012")
+		err := SetCryptKey([]byte("12345678901234567890123456789012"))
+		if err != nil {
+			t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+		}
 		cs := CryptString{String: "another secret text"}
 		t.Run("MarshalJSON", func(t *testing.T) {
 			jsonBytes, err := cs.MarshalJSON()
