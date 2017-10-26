@@ -23,6 +23,12 @@ type CryptString struct {
 	String string
 }
 
+var cryptKeeperKey []byte
+
+func init() {
+	SetCryptKey([]byte(os.Getenv("CRYPT_KEEPER_KEY")))
+}
+
 // MarshalJSON encrypts and marshals nested String
 func (cs *CryptString) MarshalJSON() ([]byte, error) {
 	encString, err := Encrypt(cs.String)
@@ -58,28 +64,26 @@ func (cs CryptString) Value() (value driver.Value, err error) {
 	return Encrypt(cs.String)
 }
 
-// TODO use a package-scoped global key
-// func SetCryptKey() {}
-
-func cryptKey() ([]byte, error) {
-	key := []byte(os.Getenv("CRYPT_KEEPER_KEY"))
-	keyLen := len(key)
+// Set Crypt Key with user input
+func SetCryptKey(secretKey []byte) error {
+	keyLen := len(secretKey)
 	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
-		return nil, fmt.Errorf("Invalid CRYPT_KEEPER_KEY; must be 16, 24, or 32 bytes (got %d)", keyLen)
+		return fmt.Errorf("Invalid KEY to set for CRYPT_KEEPER_KEY; must be 16, 24, or 32 bytes (got %d)", keyLen)
 	}
-	return key, nil
+	cryptKeeperKey = secretKey
+	return nil
+}
+
+// Get valide Crypt key
+func CryptKey() []byte {
+	return cryptKeeperKey
 }
 
 // AES-encrypt string and then base64-encode
 func Encrypt(text string) (string, error) {
-	key, err := cryptKey()
-	if err != nil {
-		return "", err
-	}
-
 	plaintext := []byte(text)
 
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(cryptKeeperKey)
 	if err != nil {
 		return "", err
 	}
@@ -100,17 +104,12 @@ func Encrypt(text string) (string, error) {
 
 // base64-decode and then AES decrypt string
 func Decrypt(cryptoText string) (string, error) {
-	key, err := cryptKey()
-	if err != nil {
-		return "", err
-	}
-
 	ciphertext, err := base64.URLEncoding.DecodeString(cryptoText)
 	if err != nil {
 		return "", err
 	}
 
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(cryptKeeperKey)
 	if err != nil {
 		return "", err
 	}

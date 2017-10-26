@@ -17,8 +17,13 @@ import (
   "github.com/blaskovicz/go-cryptkeeper"
 )
 
-// set env variable, used for encryption, to a 16, 24, or 32 byte value
-os.Setenv("CRYPT_KEEPER_KEY", "12345678901234567890123456789012")
+// set key to be used for encryption to a 16, 24, or 32 byte value
+err := cryptkeeper.SetCryptKey([]byte("12345678901234567890123456789012"))
+if err != nil {
+  panic(err)
+}
+// ... or before package initialization, set the env variable "CRYPT_KEEPER_KEY"
+// $ CRYPT_KEEPER_KEY=1234567890123456789012 go run main.go
 
 db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 if err != nil {
