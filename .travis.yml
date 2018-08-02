@@ -1,3 +1,7 @@
 language: go
+before_install:
+  - go get github.com/mattn/goveralls
 go:
-  - 1.8
+  - "1.10.x"
+script:
+  - travis_retry $GOPATH/bin/goveralls -v -race -service=travis-ci
