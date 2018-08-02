@@ -1,4 +1,4 @@
-# go-cryptkeeper [![Build Status](https://travis-ci.org/blaskovicz/go-cryptkeeper.svg?branch=master)](https://travis-ci.org/blaskovicz/go-cryptkeeper)
+# go-cryptkeeper [![Build Status](https://travis-ci.org/blaskovicz/go-cryptkeeper.svg?branch=master)](https://travis-ci.org/blaskovicz/go-cryptkeeper) [![Coverage Status](https://coveralls.io/repos/github/blaskovicz/go-cryptkeeper/badge.svg?branch=master)](https://coveralls.io/github/blaskovicz/go-cryptkeeper?branch=master) [![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/blaskovicz/go-cryptkeeper) 
 > Golang library, wrapping encryption and decryption for use as a database type and/or json.
 
 ![c](https://i.imgur.com/7exksVx.jpg)
