@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/base64"
 	"encoding/json"
@@ -13,14 +14,24 @@ import (
 	"reflect"
 )
 
-/* CryptString is a wrapper for encrypting and decrypting a string for database operations.
-It statisfies:
-- json.Marshaler
-- sql.Scanner
-- driver.Valuer
-*/
+/*CryptString is a wrapper for encrypting and decrypting a string for database operations. */
 type CryptString struct {
+	json.Marshaler
+	// TODO json.Unmarshaler
+	sql.Scanner
+	driver.Valuer
+
 	String string
+}
+
+/*CryptBytes is a wrapper for encrypting and decrypting a byte slice for database operations. */
+type CryptBytes struct {
+	json.Marshaler
+	// TODO json.Unmarshaler
+	sql.Scanner
+	driver.Valuer
+
+	Bytes []byte
 }
 
 var cryptKeeperKey []byte
@@ -29,16 +40,25 @@ func init() {
 	SetCryptKey([]byte(os.Getenv("CRYPT_KEEPER_KEY")))
 }
 
-// MarshalJSON encrypts and marshals nested String
+// MarshalJSON encrypts and marshals the underlying string
 func (cs *CryptString) MarshalJSON() ([]byte, error) {
-	encString, err := Encrypt(cs.String)
+	encrypted, err := Encrypt(cs.String)
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(encString)
+	return json.Marshal(encrypted)
 }
 
-// Scan implements sql.Scanner and decryptes incoming sql column data
+// MarshalJSON encrypts and marshals the underlying byte slice
+func (cb *CryptBytes) MarshalJSON() ([]byte, error) {
+	encrypted, err := EncryptBytes(cb.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(encrypted) // encoded as base64 per json.Marshal docs
+}
+
+// Scan implements sql.Scanner and decryptes incoming sql column data into an underlying string
 func (cs *CryptString) Scan(value interface{}) error {
 	switch v := value.(type) {
 	case string:
@@ -54,17 +74,43 @@ func (cs *CryptString) Scan(value interface{}) error {
 		}
 		cs.String = rawString
 	default:
-		return fmt.Errorf("couldn't scan %+v", reflect.TypeOf(value))
+		return fmt.Errorf("failed to scan type %+v for value", reflect.TypeOf(value))
 	}
 	return nil
 }
 
-// Value implements driver.Valuer and encrypts outgoing bind values
+// Scan implements sql.Scanner and decryptes incoming sql column data into an underlying byte slice
+func (cb *CryptBytes) Scan(value interface{}) error {
+	switch v := value.(type) {
+	case string:
+		rawBytes, err := DecryptBytes([]byte(v))
+		if err != nil {
+			return err
+		}
+		cb.Bytes = rawBytes
+	case []byte:
+		rawBytes, err := DecryptBytes(v)
+		if err != nil {
+			return err
+		}
+		cb.Bytes = rawBytes
+	default:
+		return fmt.Errorf("failed to scan type %+v for value", reflect.TypeOf(value))
+	}
+	return nil
+}
+
+// Value implements driver.Valuer and encrypts outgoing bind values for sql
 func (cs CryptString) Value() (value driver.Value, err error) {
 	return Encrypt(cs.String)
 }
 
-// Set Crypt Key with user input
+// Value implements driver.Valuer and encrypts outgoing bind values for sql
+func (cb CryptBytes) Value() (value driver.Value, err error) {
+	return EncryptBytes(cb.Bytes)
+}
+
+// SetCryptKey will set the key to be used for encryption and decryption
 func SetCryptKey(secretKey []byte) error {
 	keyLen := len(secretKey)
 	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
@@ -74,57 +120,74 @@ func SetCryptKey(secretKey []byte) error {
 	return nil
 }
 
-// Get valide Crypt key
+// CryptKey will return the current key that will be used for encryption and decryption
 func CryptKey() []byte {
 	return cryptKeeperKey
 }
 
-// AES-encrypt string and then base64-encode
+// Encrypt will AES-encrypt and base64 url-encode the given string
 func Encrypt(text string) (string, error) {
-	plaintext := []byte(text)
-
-	block, err := aes.NewCipher(cryptKeeperKey)
+	ciphertext, err := EncryptBytes([]byte(text))
 	if err != nil {
 		return "", err
 	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return "", err
-	}
-
-	cipher.NewCFBEncrypter(block, iv).XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
-
 	// convert to base64
 	return base64.URLEncoding.EncodeToString(ciphertext), nil
 }
 
-// base64-decode and then AES decrypt string
-func Decrypt(cryptoText string) (string, error) {
-	ciphertext, err := base64.URLEncoding.DecodeString(cryptoText)
+// EncryptBytes will AES-encrypt the given byte slice
+func EncryptBytes(data []byte) ([]byte, error) {
+	block, err := aes.NewCipher(cryptKeeperKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// The IV needs to be unique, but not secure, therefore it's common to
+	// include it at the beginning of the ciphertext.
+	ciphertext := make([]byte, aes.BlockSize+len(data))
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, err
+	}
+
+	cipher.NewCFBEncrypter(block, iv).XORKeyStream(ciphertext[aes.BlockSize:], data)
+
+	return ciphertext, nil
+}
+
+// Decrypt will base64 url-decode and then AES-decrypt the given string
+func Decrypt(encrypted string) (string, error) {
+	decodedBytes, err := base64.URLEncoding.DecodeString(encrypted)
 	if err != nil {
 		return "", err
 	}
 
-	block, err := aes.NewCipher(cryptKeeperKey)
+	ciphertext, err := DecryptBytes(decodedBytes)
 	if err != nil {
 		return "", err
+	}
+
+	return string(ciphertext), nil
+}
+
+// DecryptBytes will AES-decrypt the given byte slice
+func DecryptBytes(encrypted []byte) ([]byte, error) {
+	block, err := aes.NewCipher(cryptKeeperKey)
+	if err != nil {
+		return nil, err
 	}
 
 	// The IV needs to be unique, but not secure. Therefore it's common to
 	// include it at the beginning of the ciphertext.
-	if byteLen := len(ciphertext); byteLen < aes.BlockSize {
-		return "", fmt.Errorf("invalid cipher size %d.", byteLen)
+	if byteLen := len(encrypted); byteLen < aes.BlockSize {
+		return nil, fmt.Errorf("invalid cipher size %d, expected at least %d", byteLen, aes.BlockSize)
 	}
 
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
+	iv := encrypted[:aes.BlockSize]
+	encrypted = encrypted[aes.BlockSize:]
 
 	// XORKeyStream can work in-place if the two arguments are the same.
-	cipher.NewCFBDecrypter(block, iv).XORKeyStream(ciphertext, ciphertext)
+	cipher.NewCFBDecrypter(block, iv).XORKeyStream(encrypted, encrypted)
 
-	return string(ciphertext), nil
+	return encrypted, nil
 }

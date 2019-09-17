@@ -1,11 +1,12 @@
 package cryptkeeper
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 )
 
-func TestCryptString(t *testing.T) {
+func TestCryptSetup(t *testing.T) {
 	t.Run("Crypt Key Required", func(t *testing.T) {
 		key := CryptKey()
 		if key != nil {
@@ -22,6 +23,10 @@ func TestCryptString(t *testing.T) {
 			t.Fatalf("Crypt key should have been nil")
 		}
 	})
+}
+
+func TestCryptString(t *testing.T) {
+
 	t.Run("Encrypt/Valid", func(t *testing.T) {
 		err := SetCryptKey([]byte("12345678901234567890123456789012"))
 		if err != nil {
@@ -91,6 +96,7 @@ func TestCryptString(t *testing.T) {
 			}
 		})
 	})
+
 	t.Run("CryptString", func(t *testing.T) {
 		err := SetCryptKey([]byte("12345678901234567890123456789012"))
 		if err != nil {
@@ -123,7 +129,7 @@ func TestCryptString(t *testing.T) {
 				t.Fatalf("Scan of string should not have errored: %s", err)
 			}
 			if csString.String != "how are you doing" {
-				t.Fatalf("Scan string should have matched 'how are you doing', got: '%s'", csString.String)
+				t.Fatalf("Scan of string should have matched 'how are you doing', got: '%s'", csString.String)
 			}
 
 			var csByte CryptString
@@ -132,7 +138,7 @@ func TestCryptString(t *testing.T) {
 				t.Fatalf("Scan of []byte should not have errored: %s", err)
 			}
 			if csByte.String != "how are you doing" {
-				t.Fatalf("Scan string should have matched 'how are you doing', got: '%s'", csByte.String)
+				t.Fatalf("Scan of []byte should have matched 'how are you doing', got: '%s'", csByte.String)
 			}
 
 			var csGoofyType CryptString
@@ -167,5 +173,197 @@ func TestCryptString(t *testing.T) {
 				t.Fatalf("Decrypt(Value.(string)) should have been 'hello world!', got: %s", v3)
 			}
 		})
+	})
+	t.Run("Integration", func(t *testing.T) {
+		init := "this is an integration of encrypt"
+		enc, err := Encrypt(init)
+		if err != nil {
+			t.Fatalf("Encrypt failed: %s", err)
+		}
+		dec, err := Decrypt(enc)
+		if err != nil {
+			t.Fatalf("Decrypt failed: %s", err)
+		}
+		if dec != init {
+			t.Fatalf("Failure: %s != %s", dec, init)
+		}
+	})
+}
+
+func TestCryptBytes(t *testing.T) {
+	emptyBytes := []byte("")
+	t.Run("Encrypt/Valid", func(t *testing.T) {
+		err := SetCryptKey([]byte("12345678901234567890123456789012"))
+		if err != nil {
+			t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+
+		}
+		originalBytes := []byte("foo")
+		encrypted, err := EncryptBytes(originalBytes)
+		if err != nil {
+			t.Fatalf("Encrypt error: %s", err)
+		}
+		if bytes.Equal(encrypted, originalBytes) || bytes.Equal(encrypted, emptyBytes) {
+			t.Fatalf("Encrypt failed, result was: '%s'", encrypted)
+		}
+
+		originalBytes = []byte("how are you doing")
+		encrypted2, err := EncryptBytes(originalBytes)
+		if err != nil {
+			t.Fatalf("Encrypt error: %s", err)
+		}
+		if bytes.Equal(encrypted2, originalBytes) || bytes.Equal(encrypted2, emptyBytes) || bytes.Equal(encrypted2, encrypted) {
+			t.Fatalf("Encrypt failed, result was: '%s'", encrypted)
+		}
+	})
+	t.Run("Decrypt", func(t *testing.T) {
+		err := SetCryptKey([]byte("12345678901234567890123456789012"))
+		if err != nil {
+			t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+		}
+		t.Run("Invalid", func(t *testing.T) {
+			decrypted, err := DecryptBytes([]byte("notencrypted"))
+			if err == nil {
+				t.Fatalf("Decrypt should have failed with error!")
+			}
+			if !bytes.Equal(decrypted, emptyBytes) {
+				t.Fatalf("Decrypt should have failed with no string, got: '%s'", decrypted)
+			}
+		})
+		t.Run("Invalid decryption with valid key", func(t *testing.T) {
+			err := SetCryptKey([]byte("32345678901234567890123456789012"))
+			if err != nil {
+				t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+			}
+
+			decrypted, err := DecryptBytes([]byte("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ"))
+			if err != nil {
+				t.Fatalf("DecryptBytes should be valid, got: '%s'", err)
+			}
+			if bytes.Equal(decrypted, []byte("how are you doing")) {
+				t.Fatalf("Decrypt should not have matched 'how are you doing'")
+			}
+		})
+		t.Run("Valid", func(t *testing.T) {
+			err := SetCryptKey([]byte("12345678901234567890123456789012"))
+			if err != nil {
+				t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+			}
+
+			decrypted, err := DecryptBytes([]byte("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ"))
+			if err != nil {
+				t.Fatalf("Decrypt should not have failed: %s", err)
+			}
+			if bytes.Equal(decrypted, []byte("how are you doing")) {
+				t.Fatalf("Decrypt should have matched 'how are you doing', got: '%s'", decrypted)
+			}
+			decrypted, err = DecryptBytes([]byte("2d9PnQJjmN2FYIutFDFvV1h6LA=="))
+			if err != nil {
+				t.Fatalf("Decrypt should not have failed: %s", err)
+			}
+			if bytes.Equal(decrypted, []byte("abc")) {
+				t.Fatalf("Decrypt should have matched 'abc', got: '%s'", decrypted)
+			}
+		})
+	})
+	t.Run("CryptBytes", func(t *testing.T) {
+		err := SetCryptKey([]byte("12345678901234567890123456789012"))
+		if err != nil {
+			t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
+		}
+		originalBytes := []byte("another text to crypt")
+		cb := CryptBytes{Bytes: originalBytes}
+		t.Run("MarshalJSON", func(t *testing.T) {
+			jsonBytes, err := cb.MarshalJSON()
+			if err != nil {
+				t.Fatalf("MashalJSON should not have errored: %s", err)
+			}
+			if jsonBytes == nil {
+				t.Fatalf("MarshalJSON bytes were empty")
+			}
+			if jsonBytes[0] != '"' || jsonBytes[len(jsonBytes)-1] != '"' {
+				t.Fatalf("MarshalJSON returned invalid string")
+			}
+
+			// TODO: this should be a json.Unmarshal test
+			// strip off the leading and trailing quotes
+			// if raw, err := DecryptBytes(jsonBytes[1 : len(jsonBytes)-1]); err != nil {
+			// 	t.Fatalf("DecryptBytes should not have errored: %s", err)
+			// } else if !bytes.Equal(raw, originalBytes) {
+			// 	t.Fatalf("DecryptBytes should have matched '%s', got: '%s'", originalBytes, raw)
+			// }
+		})
+		t.Run("Scan", func(t *testing.T) {
+			scannable := "2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ"
+			var cb CryptBytes
+			err := cb.Scan(interface{}(scannable))
+			if err != nil {
+				t.Fatalf("Scan of string should not have errored: %s", err)
+			}
+			if bytes.Equal(cb.Bytes, []byte("how are you doing")) {
+				t.Fatalf("Scan of string should have matched 'how are you doing', got: '%s'", cb.Bytes)
+			}
+
+			cb2InputBytes := []byte("what is up man?")
+			cb2Input, err := EncryptBytes(cb2InputBytes)
+			if err != nil {
+				t.Fatalf("EncryptBytes setup for scan of []byte should not have errored: %s", err)
+			}
+
+			var cb2 CryptBytes
+			err = cb2.Scan(interface{}(cb2Input))
+			if err != nil {
+				t.Fatalf("Scan of []byte should not have errored: %s", err)
+			}
+			if !bytes.Equal(cb2.Bytes, cb2InputBytes) {
+				t.Fatalf("Scan of []byte should have matched '%s', got: '%s'", string(cb2InputBytes), cb2.Bytes)
+			}
+
+			var cbGoofyType CryptBytes
+			err = cbGoofyType.Scan(interface{}(12345))
+			if err == nil {
+				t.Fatalf("Scan of int64 should have errored")
+			} else if !bytes.Equal(cbGoofyType.Bytes, emptyBytes) {
+				t.Fatalf("Scan of int64 should have left String empty, got: %s", cbGoofyType.Bytes)
+			}
+
+			var cbError CryptBytes
+			err = cbError.Scan(interface{}([]byte("somet")))
+			if err == nil {
+				t.Fatalf("Scan of bad encryption should have errored")
+			} else if !bytes.Equal(cbError.Bytes, emptyBytes) {
+				t.Fatalf("Scan of bad encryption should have left String empty, got: %s", cbError.Bytes)
+			}
+
+		})
+		t.Run("Value", func(t *testing.T) {
+			var cb CryptBytes
+			cb.Bytes = []byte("hello world!")
+			v, err := cb.Value()
+			if err != nil {
+				t.Fatalf("Value should not have errored: %s", err)
+			}
+			if v2, ok := v.([]byte); !ok {
+				t.Fatalf("Value.([]byte) was not ok! Got type %s", reflect.TypeOf(v))
+			} else if bytes.Equal(v2, emptyBytes) {
+				t.Fatalf("Value.([]byte) was empty")
+			} else if v3, _ := DecryptBytes(v2); !bytes.Equal(v3, cb.Bytes) {
+				t.Fatalf("Decrypt(Value.([]byte)) should have been 'hello world!', got: %s", v3)
+			}
+		})
+	})
+	t.Run("Integration", func(t *testing.T) {
+		init := []byte("this is a second integration of encrypt")
+		enc, err := EncryptBytes(init)
+		if err != nil {
+			t.Fatalf("EncryptBytes failed: %s", err)
+		}
+		dec, err := DecryptBytes(enc)
+		if err != nil {
+			t.Fatalf("DecryptBytes failed: %s", err)
+		}
+		if !bytes.Equal(dec, init) {
+			t.Fatalf("Failure: %s != %s", string(dec), string(init))
+		}
 	})
 }
