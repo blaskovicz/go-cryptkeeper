@@ -121,6 +121,15 @@ func TestCryptString(t *testing.T) {
 				t.Fatalf("Decrypt should have matched 'another secret text', got: '%s'", raw)
 			}
 		})
+		t.Run("UnmarshalJSON", func(t *testing.T) {
+			// previous tests are responsible for any errors in MarshalJSON, assume this works
+			jsonBytes, _ := cs.MarshalJSON()
+
+			err = cs.UnmarshalJSON(jsonBytes)
+			if err != nil || cs.String != "another secret text" {
+				t.Fatalf("UnmarshalJSON failed to provide original value")
+			}
+		})
 		t.Run("Scan", func(t *testing.T) {
 			scannable := "2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ"
 			var csString CryptString
@@ -284,14 +293,19 @@ func TestCryptBytes(t *testing.T) {
 			if jsonBytes[0] != '"' || jsonBytes[len(jsonBytes)-1] != '"' {
 				t.Fatalf("MarshalJSON returned invalid string")
 			}
+		})
+		t.Run("UnmarshalJSON", func(t *testing.T) {
+			// previous tests are responsible for any errors in MarshalJSON, assume this works
+			jsonBytes, _ := cb.MarshalJSON()
 
-			// TODO: this should be a json.Unmarshal test
-			// strip off the leading and trailing quotes
-			// if raw, err := DecryptBytes(jsonBytes[1 : len(jsonBytes)-1]); err != nil {
-			// 	t.Fatalf("DecryptBytes should not have errored: %s", err)
-			// } else if !bytes.Equal(raw, originalBytes) {
-			// 	t.Fatalf("DecryptBytes should have matched '%s', got: '%s'", originalBytes, raw)
-			// }
+			err := cb.UnmarshalJSON(jsonBytes)
+			if err != nil {
+				t.Fatalf("UnmarshalJSON should not have errored: %s", err)
+			}
+
+			if !bytes.Equal(originalBytes, cb.Bytes) {
+				t.Fatalf("UnmarshalJSON should have matched '%s', got: '%s'", originalBytes, cb.Bytes)
+			}
 		})
 		t.Run("Scan", func(t *testing.T) {
 			scannable := "2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ"
