@@ -17,7 +17,7 @@ import (
 /*CryptString is a wrapper for encrypting and decrypting a string for database operations. */
 type CryptString struct {
 	json.Marshaler
-	// TODO json.Unmarshaler
+	json.Unmarshaler
 	sql.Scanner
 	driver.Valuer
 
@@ -27,7 +27,7 @@ type CryptString struct {
 /*CryptBytes is a wrapper for encrypting and decrypting a byte slice for database operations. */
 type CryptBytes struct {
 	json.Marshaler
-	// TODO json.Unmarshaler
+	json.Unmarshaler
 	sql.Scanner
 	driver.Valuer
 
@@ -56,6 +56,38 @@ func (cb *CryptBytes) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(encrypted) // encoded as base64 per json.Marshal docs
+}
+
+// UnmarshalJSON unmarshals and decrypts the underlying string into the CryptString instance
+func (cs *CryptString) UnmarshalJSON(b []byte) error {
+	var target string
+	if err := json.Unmarshal(b, &target); err != nil {
+		return err
+	}
+
+	decrypted, err := Decrypt(target)
+	if err != nil {
+		return err
+	}
+
+	cs.String = decrypted
+	return nil
+}
+
+// UnmarshalJSON unmarshals and decrypts the underlying byte slice into the CryptBytes instance
+func (cb *CryptBytes) UnmarshalJSON(b []byte) error {
+	var target []byte
+	if err := json.Unmarshal(b, &target); err != nil {
+		return err
+	}
+
+	decrypted, err := DecryptBytes(target)
+	if err != nil {
+		return err
+	}
+
+	cb.Bytes = decrypted
+	return nil
 }
 
 // Scan implements sql.Scanner and decryptes incoming sql column data into an underlying string
