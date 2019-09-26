@@ -31,13 +31,13 @@ func TestCryptString(t *testing.T) {
 		t.Run("Invalid Encrypt", func(t *testing.T) {
 			_, err := Encrypt("abc")
 			if err == nil {
-				t.Fatalf("Encrypt without SetCryptKey should have errored: '%s'", err)
+				t.Fatalf("Encrypt without SetCryptKey should have errored")
 			}
 		})
 		t.Run("Invalid Decrypt", func(t *testing.T) {
 			_, err := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ")
 			if err == nil {
-				t.Fatalf("Decrypt without SetCryptKey should have errored: %s", err)
+				t.Fatalf("Decrypt without SetCryptKey should have errored")
 			}
 		})
 	})
