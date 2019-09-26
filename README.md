@@ -20,7 +20,7 @@ import (
   "github.com/blaskovicz/go-cryptkeeper"
 )
 
-// set key to be used for encryption to a 16, 24, or 32 byte value
+// set key to be used for encryption. Must be <= 32 bytes
 err := cryptkeeper.SetCryptKey([]byte("12345678901234567890123456789012"))
 if err != nil {
   panic(err)

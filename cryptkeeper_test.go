@@ -15,12 +15,15 @@ func TestCryptSetup(t *testing.T) {
 	})
 	t.Run("Valid Crypt Key Required", func(t *testing.T) {
 		err := SetCryptKey([]byte("123"))
-		if err == nil {
-			t.Fatalf("SetCryptKey should have returned an error")
+		if err != nil {
+			t.Fatalf("SetCryptKey should be valid, got: %v", err)
 		}
 		key := CryptKey()
-		if key != nil {
-			t.Fatalf("Crypt key should have been nil")
+		if key == nil {
+			t.Fatalf("Crypt key should not be nil")
+		}
+		if len(key) != 3 {
+			t.Fatalf("Crpyt key should not include padding. Got %d bytes", len(key))
 		}
 	})
 }
