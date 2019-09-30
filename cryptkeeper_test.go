@@ -27,6 +27,20 @@ func TestCryptSetup(t *testing.T) {
 
 func TestCryptString(t *testing.T) {
 
+	t.Run("Invalid without SetCryptKey", func(t *testing.T) {
+		t.Run("Invalid Encrypt", func(t *testing.T) {
+			_, err := Encrypt("abc")
+			if err == nil {
+				t.Fatalf("Encrypt without SetCryptKey should have errored")
+			}
+		})
+		t.Run("Invalid Decrypt", func(t *testing.T) {
+			_, err := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ")
+			if err == nil {
+				t.Fatalf("Decrypt without SetCryptKey should have errored")
+			}
+		})
+	})
 	t.Run("Encrypt/Valid", func(t *testing.T) {
 		err := SetCryptKey([]byte("12345678901234567890123456789012"))
 		if err != nil {
@@ -129,6 +143,13 @@ func TestCryptString(t *testing.T) {
 			if err != nil || cs.String != "another secret text" {
 				t.Fatalf("UnmarshalJSON failed to provide original value")
 			}
+
+			badJsonBytes := append(jsonBytes, '}')
+
+			err = cs.UnmarshalJSON(badJsonBytes)
+			if err == nil {
+				t.Fatalf("UnmarshalJSON with bad json bytes should have errored")
+			}
 		})
 		t.Run("Scan", func(t *testing.T) {
 			scannable := "2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ"
@@ -148,6 +169,12 @@ func TestCryptString(t *testing.T) {
 			}
 			if csByte.String != "how are you doing" {
 				t.Fatalf("Scan of []byte should have matched 'how are you doing', got: '%s'", csByte.String)
+			}
+
+			badScannable := "@tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ"
+			err = csString.Scan(interface{}(badScannable))
+			if err == nil {
+				t.Fatalf("Scan of malformed encrypted string should have errored")
 			}
 
 			var csGoofyType CryptString
@@ -305,6 +332,13 @@ func TestCryptBytes(t *testing.T) {
 
 			if !bytes.Equal(originalBytes, cb.Bytes) {
 				t.Fatalf("UnmarshalJSON should have matched '%s', got: '%s'", originalBytes, cb.Bytes)
+			}
+
+			badJsonBytes := append(jsonBytes, '}')
+
+			err = cb.UnmarshalJSON(badJsonBytes)
+			if err == nil {
+				t.Fatalf("UnmarshalJSON with bad json bytes should have errored")
 			}
 		})
 		t.Run("Scan", func(t *testing.T) {
