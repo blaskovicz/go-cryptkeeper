@@ -418,3 +418,32 @@ func TestCryptBytes(t *testing.T) {
 		}
 	})
 }
+
+func TestPKCS7Padding(t *testing.T) {
+	checkPadding := func(name string, check []byte, expect []byte) {
+		t.Run(name, func(t *testing.T) {
+			if buf, err := pkcs7Pad(check); err == nil {
+				if !bytes.Equal(buf, expect) {
+					t.Errorf("pkcs7pad failed. Result was %#v\n", buf)
+				}
+			} else {
+				t.Errorf("pkcs7pad failed. Error: %v\n", err)
+			}
+		})
+	}
+
+	if _, err := pkcs7Pad(nil); err == nil {
+		t.Error("expected error for nil byte slice")
+	}
+
+	checkPadding("under 16 bytes", []byte("123"), []byte("123\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d"))
+	checkPadding("16 bytes", []byte("1234567890123456"), []byte("1234567890123456"))
+	checkPadding("over 16 bytes", []byte("12345678901234567"), []byte("12345678901234567\x07\x07\x07\x07\x07\x07\x07"))
+	checkPadding("24 bytes", []byte("123456789012345678901234"), []byte("123456789012345678901234"))
+	checkPadding("over 24 bytes", []byte("1234567890123456789012345"), []byte("1234567890123456789012345\x07\x07\x07\x07\x07\x07\x07"))
+	checkPadding("32 bytes", []byte("12345678901234567890123456789012"), []byte("12345678901234567890123456789012"))
+
+	if _, err := pkcs7Pad(bytes.Repeat([]byte("A"), 40)); err == nil {
+		t.Error("expected error for invalid slice size")
+	}
+}

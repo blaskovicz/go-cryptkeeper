@@ -163,7 +163,7 @@ func CryptKey() []byte {
 	}
 	key, err := pkcs7Unpad(cryptKeeperKey)
 	if err != nil {
-		panic("bug")
+		panic(fmt.Errorf("unpad of key failed. this should not happen: %s", err))
 	}
 	return key
 }
@@ -237,54 +237,57 @@ func DecryptBytes(encrypted []byte) ([]byte, error) {
 
 // pkcs7pad pads b to the nearest 16, 24 or 32 byte
 func pkcs7Pad(b []byte) ([]byte, error) {
-	if len(b) == 0 {
+	bLen := len(b)
+	if bLen == 0 {
 		return nil, fmt.Errorf("invalid KEY")
 	}
 
-	blockSize := getBlockSize(len(b))
+	blockSize := getBlockSize(bLen)
 	if blockSize == -1 {
-		return nil, fmt.Errorf("Invalid KEY to set for CRYPT_KEEPER_KEY; must be <= 32 bytes (got %d)", len(b))
+		return nil, fmt.Errorf("Invalid KEY to set for CRYPT_KEEPER_KEY; must be <= 32 bytes (got %d)", bLen)
 	}
 
-	n := blockSize - (len(b) % blockSize)
+	n := blockSize - (bLen % blockSize)
 	out := make([]byte, blockSize)
 	copy(out, b)
-	copy(out[len(b):], bytes.Repeat([]byte{byte(n)}, n))
+	copy(out[bLen:], bytes.Repeat([]byte{byte(n)}, n))
 	return out, nil
 }
 
 func pkcs7Unpad(b []byte) ([]byte, error) {
-	if len(b) == 0 {
-		return nil, fmt.Errorf("Invalid KEY. Must be at least 1 byte (got %d)", len(b))
+	bLen := len(b)
+	if bLen == 0 {
+		return nil, fmt.Errorf("Invalid KEY. Must be at least 1 byte (got %d)", bLen)
 	}
 
-	blockSize := getBlockSize(len(b))
+	blockSize := getBlockSize(bLen)
 	if blockSize == -1 {
-		return nil, fmt.Errorf("Invalid KEY. Must be <= 32 bytes (got %d)", len(b))
+		return nil, fmt.Errorf("Invalid KEY. Must be <= 32 bytes (got %d)", bLen)
 	}
 
-	c := b[len(b)-1]
+	c := b[bLen-1]
 	n := int(c)
-	if n == 0 || n > len(b) {
+	if n == 0 || n > bLen {
 		return nil, fmt.Errorf("Invalid PKCS7 padding in KEY")
 	}
 
 	for i := 0; i < n; i++ {
-		if b[len(b)-n+i] != c {
+		if b[bLen-n+i] != c {
 			return nil, fmt.Errorf("Invalid PKCS7 padding in KEY")
 		}
 	}
-	return b[:len(b)-n], nil
+	return b[:bLen-n], nil
 }
 
 func getBlockSize(n int) int {
-	if n <= 16 {
+	switch {
+	case n <= 16:
 		return 16
-	} else if n <= 24 {
+	case n <= 24:
 		return 24
-	} else if n <= 32 {
+	case n <= 32:
 		return 32
-	} else {
+	default:
 		return -1
 	}
 }
