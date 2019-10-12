@@ -1,6 +1,7 @@
 package cryptkeeper
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -146,7 +147,10 @@ func (cb CryptBytes) Value() (value driver.Value, err error) {
 func SetCryptKey(secretKey []byte) error {
 	keyLen := len(secretKey)
 	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
-		return fmt.Errorf("Invalid KEY to set for CRYPT_KEEPER_KEY; must be 16, 24, or 32 bytes (got %d)", keyLen)
+		var err error
+		if secretKey, err = pkcs7Pad(secretKey); err != nil {
+			return err
+		}
 	}
 	cryptKeeperKey = secretKey
 	return nil
@@ -154,7 +158,14 @@ func SetCryptKey(secretKey []byte) error {
 
 // CryptKey will return the current key that will be used for encryption and decryption
 func CryptKey() []byte {
-	return cryptKeeperKey
+	if cryptKeeperKey == nil {
+		return cryptKeeperKey
+	}
+	key, err := pkcs7Unpad(cryptKeeperKey)
+	if err != nil {
+		panic(fmt.Errorf("unpad of key failed. this should not happen: %s", err))
+	}
+	return key
 }
 
 // Encrypt will AES-encrypt and base64 url-encode the given string
@@ -222,4 +233,61 @@ func DecryptBytes(encrypted []byte) ([]byte, error) {
 	cipher.NewCFBDecrypter(block, iv).XORKeyStream(encrypted, encrypted)
 
 	return encrypted, nil
+}
+
+// pkcs7pad pads b to the nearest 16, 24 or 32 byte
+func pkcs7Pad(b []byte) ([]byte, error) {
+	bLen := len(b)
+	if bLen == 0 {
+		return nil, fmt.Errorf("invalid KEY")
+	}
+
+	blockSize := getBlockSize(bLen)
+	if blockSize == -1 {
+		return nil, fmt.Errorf("Invalid KEY to set for CRYPT_KEEPER_KEY; must be <= 32 bytes (got %d)", bLen)
+	}
+
+	n := blockSize - (bLen % blockSize)
+	out := make([]byte, blockSize)
+	copy(out, b)
+	copy(out[bLen:], bytes.Repeat([]byte{byte(n)}, n))
+	return out, nil
+}
+
+func pkcs7Unpad(b []byte) ([]byte, error) {
+	bLen := len(b)
+	if bLen == 0 {
+		return nil, fmt.Errorf("Invalid KEY. Must be at least 1 byte (got %d)", bLen)
+	}
+
+	blockSize := getBlockSize(bLen)
+	if blockSize == -1 {
+		return nil, fmt.Errorf("Invalid KEY. Must be <= 32 bytes (got %d)", bLen)
+	}
+
+	c := b[bLen-1]
+	n := int(c)
+	if n == 0 || n > bLen {
+		return nil, fmt.Errorf("Invalid PKCS7 padding in KEY")
+	}
+
+	for i := 0; i < n; i++ {
+		if b[bLen-n+i] != c {
+			return nil, fmt.Errorf("Invalid PKCS7 padding in KEY")
+		}
+	}
+	return b[:bLen-n], nil
+}
+
+func getBlockSize(n int) int {
+	switch {
+	case n <= 16:
+		return 16
+	case n <= 24:
+		return 24
+	case n <= 32:
+		return 32
+	default:
+		return -1
+	}
 }

@@ -15,32 +15,36 @@ func TestCryptSetup(t *testing.T) {
 	})
 	t.Run("Valid Crypt Key Required", func(t *testing.T) {
 		err := SetCryptKey([]byte("123"))
-		if err == nil {
-			t.Fatalf("SetCryptKey should have returned an error")
+		if err != nil {
+			t.Fatalf("SetCryptKey should be valid, got: %v", err)
 		}
 		key := CryptKey()
-		if key != nil {
-			t.Fatalf("Crypt key should have been nil")
+		if key == nil {
+			t.Fatalf("Crypt key should not be nil")
+		}
+		if len(key) != 3 {
+			t.Fatalf("Crpyt key should not include padding. Got %d bytes", len(key))
+		}
+	})
+}
+
+func TestInvalidCrpytKey(t *testing.T) {
+	cryptKeeperKey = nil
+	t.Run("Invalid Encrypt", func(t *testing.T) {
+		_, err := Encrypt("abc")
+		if err == nil {
+			t.Fatalf("Encrypt without SetCryptKey should have errored")
+		}
+	})
+	t.Run("Invalid Decrypt", func(t *testing.T) {
+		_, err := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ")
+		if err == nil {
+			t.Fatalf("Decrypt without SetCryptKey should have errored")
 		}
 	})
 }
 
 func TestCryptString(t *testing.T) {
-
-	t.Run("Invalid without SetCryptKey", func(t *testing.T) {
-		t.Run("Invalid Encrypt", func(t *testing.T) {
-			_, err := Encrypt("abc")
-			if err == nil {
-				t.Fatalf("Encrypt without SetCryptKey should have errored")
-			}
-		})
-		t.Run("Invalid Decrypt", func(t *testing.T) {
-			_, err := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ")
-			if err == nil {
-				t.Fatalf("Decrypt without SetCryptKey should have errored")
-			}
-		})
-	})
 	t.Run("Encrypt/Valid", func(t *testing.T) {
 		err := SetCryptKey([]byte("12345678901234567890123456789012"))
 		if err != nil {
@@ -414,4 +418,33 @@ func TestCryptBytes(t *testing.T) {
 			t.Fatalf("Failure: %s != %s", string(dec), string(init))
 		}
 	})
+}
+
+func TestPKCS7Padding(t *testing.T) {
+	checkPadding := func(name string, check []byte, expect []byte) {
+		t.Run(name, func(t *testing.T) {
+			if buf, err := pkcs7Pad(check); err == nil {
+				if !bytes.Equal(buf, expect) {
+					t.Errorf("pkcs7pad failed. Result was %#v\n", buf)
+				}
+			} else {
+				t.Errorf("pkcs7pad failed. Error: %v\n", err)
+			}
+		})
+	}
+
+	if _, err := pkcs7Pad(nil); err == nil {
+		t.Error("expected error for nil byte slice")
+	}
+
+	checkPadding("under 16 bytes", []byte("123"), []byte("123\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d\x0d"))
+	checkPadding("16 bytes", []byte("1234567890123456"), []byte("1234567890123456"))
+	checkPadding("over 16 bytes", []byte("12345678901234567"), []byte("12345678901234567\x07\x07\x07\x07\x07\x07\x07"))
+	checkPadding("24 bytes", []byte("123456789012345678901234"), []byte("123456789012345678901234"))
+	checkPadding("over 24 bytes", []byte("1234567890123456789012345"), []byte("1234567890123456789012345\x07\x07\x07\x07\x07\x07\x07"))
+	checkPadding("32 bytes", []byte("12345678901234567890123456789012"), []byte("12345678901234567890123456789012"))
+
+	if _, err := pkcs7Pad(bytes.Repeat([]byte("A"), 40)); err == nil {
+		t.Error("expected error for invalid slice size")
+	}
 }
