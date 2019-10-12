@@ -28,22 +28,23 @@ func TestCryptSetup(t *testing.T) {
 	})
 }
 
-func TestCryptString(t *testing.T) {
-
-	t.Run("Invalid without SetCryptKey", func(t *testing.T) {
-		t.Run("Invalid Encrypt", func(t *testing.T) {
-			_, err := Encrypt("abc")
-			if err == nil {
-				t.Fatalf("Encrypt without SetCryptKey should have errored")
-			}
-		})
-		t.Run("Invalid Decrypt", func(t *testing.T) {
-			_, err := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ")
-			if err == nil {
-				t.Fatalf("Decrypt without SetCryptKey should have errored")
-			}
-		})
+func TestInvalidCrpytKey(t *testing.T) {
+	cryptKeeperKey = nil
+	t.Run("Invalid Encrypt", func(t *testing.T) {
+		_, err := Encrypt("abc")
+		if err == nil {
+			t.Fatalf("Encrypt without SetCryptKey should have errored")
+		}
 	})
+	t.Run("Invalid Decrypt", func(t *testing.T) {
+		_, err := Decrypt("2tHq4GL8r7tTvfk6l2TS8d5nVDXY6ztqz6WTmbmq8ZOJ")
+		if err == nil {
+			t.Fatalf("Decrypt without SetCryptKey should have errored")
+		}
+	})
+}
+
+func TestCryptString(t *testing.T) {
 	t.Run("Encrypt/Valid", func(t *testing.T) {
 		err := SetCryptKey([]byte("12345678901234567890123456789012"))
 		if err != nil {
