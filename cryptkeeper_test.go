@@ -312,6 +312,7 @@ func TestCryptBytes(t *testing.T) {
 		}
 		originalBytes := []byte("another text to crypt")
 		cb := CryptBytes{Bytes: originalBytes}
+		cb.Valid = true
 		t.Run("MarshalJSON", func(t *testing.T) {
 			jsonBytes, err := cb.MarshalJSON()
 			if err != nil {
@@ -390,6 +391,7 @@ func TestCryptBytes(t *testing.T) {
 		t.Run("Value", func(t *testing.T) {
 			var cb CryptBytes
 			cb.Bytes = []byte("hello world!")
+			cb.Valid = true
 			v, err := cb.Value()
 			if err != nil {
 				t.Fatalf("Value should not have errored: %s", err)

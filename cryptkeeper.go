@@ -32,6 +32,7 @@ type CryptBytes struct {
 	driver.Valuer
 
 	Bytes []byte
+	Valid bool
 }
 
 var cryptKeeperKey []byte
@@ -54,6 +55,9 @@ func (cs *CryptString) MarshalJSON() ([]byte, error) {
 
 // MarshalJSON encrypts and marshals the underlying byte slice
 func (cb *CryptBytes) MarshalJSON() ([]byte, error) {
+	if !cb.Valid {
+		return []byte(nil), nil
+	}
 	encrypted, err := EncryptBytes(cb.Bytes)
 	if err != nil {
 		return nil, err
@@ -91,6 +95,7 @@ func (cb *CryptBytes) UnmarshalJSON(b []byte) error {
 	}
 
 	cb.Bytes = decrypted
+	cb.Valid = true
 	return nil
 }
 
@@ -126,12 +131,14 @@ func (cb *CryptBytes) Scan(value interface{}) error {
 			return err
 		}
 		cb.Bytes = rawBytes
+		cb.Valid = true
 	case []byte:
 		rawBytes, err := DecryptBytes(v)
 		if err != nil {
 			return err
 		}
 		cb.Bytes = rawBytes
+		cb.Valid = true
 	default:
 		return fmt.Errorf("failed to scan type %+v for value", reflect.TypeOf(value))
 	}
