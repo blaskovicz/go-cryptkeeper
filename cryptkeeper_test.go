@@ -116,7 +116,9 @@ func TestCryptString(t *testing.T) {
 		if err != nil {
 			t.Fatalf("SetCryptKey should be valid, got: '%s'", err)
 		}
-		cs := CryptString{String: "another secret text"}
+		var cs CryptString
+		cs.String = "another secret text"
+		cs.Valid = true
 		t.Run("MarshalJSON", func(t *testing.T) {
 			jsonBytes, err := cs.MarshalJSON()
 			if err != nil {
@@ -197,6 +199,7 @@ func TestCryptString(t *testing.T) {
 		t.Run("Value", func(t *testing.T) {
 			var cs CryptString
 			cs.String = "hello world!"
+			cs.Valid = true
 			v, err := cs.Value()
 			if err != nil {
 				t.Fatalf("Value should not have errored: %s", err)
@@ -309,6 +312,7 @@ func TestCryptBytes(t *testing.T) {
 		}
 		originalBytes := []byte("another text to crypt")
 		cb := CryptBytes{Bytes: originalBytes}
+		cb.Valid = true
 		t.Run("MarshalJSON", func(t *testing.T) {
 			jsonBytes, err := cb.MarshalJSON()
 			if err != nil {
@@ -387,6 +391,7 @@ func TestCryptBytes(t *testing.T) {
 		t.Run("Value", func(t *testing.T) {
 			var cb CryptBytes
 			cb.Bytes = []byte("hello world!")
+			cb.Valid = true
 			v, err := cb.Value()
 			if err != nil {
 				t.Fatalf("Value should not have errored: %s", err)

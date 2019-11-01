@@ -21,7 +21,7 @@ type CryptString struct {
 	sql.Scanner
 	driver.Valuer
 
-	String string
+	sql.NullString
 }
 
 /*CryptBytes is a wrapper for encrypting and decrypting a byte slice for database operations. */
@@ -32,6 +32,7 @@ type CryptBytes struct {
 	driver.Valuer
 
 	Bytes []byte
+	Valid bool
 }
 
 var cryptKeeperKey []byte
@@ -42,6 +43,9 @@ func init() {
 
 // MarshalJSON encrypts and marshals the underlying string
 func (cs *CryptString) MarshalJSON() ([]byte, error) {
+	if !cs.Valid {
+		return []byte(nil), nil
+	}
 	encrypted, err := Encrypt(cs.String)
 	if err != nil {
 		return nil, err
@@ -51,6 +55,9 @@ func (cs *CryptString) MarshalJSON() ([]byte, error) {
 
 // MarshalJSON encrypts and marshals the underlying byte slice
 func (cb *CryptBytes) MarshalJSON() ([]byte, error) {
+	if !cb.Valid {
+		return []byte(nil), nil
+	}
 	encrypted, err := EncryptBytes(cb.Bytes)
 	if err != nil {
 		return nil, err
@@ -71,6 +78,7 @@ func (cs *CryptString) UnmarshalJSON(b []byte) error {
 	}
 
 	cs.String = decrypted
+	cs.Valid = true
 	return nil
 }
 
@@ -87,6 +95,7 @@ func (cb *CryptBytes) UnmarshalJSON(b []byte) error {
 	}
 
 	cb.Bytes = decrypted
+	cb.Valid = true
 	return nil
 }
 
@@ -99,12 +108,14 @@ func (cs *CryptString) Scan(value interface{}) error {
 			return err
 		}
 		cs.String = rawString
+		cs.Valid = true
 	case []byte:
 		rawString, err := Decrypt(string(v))
 		if err != nil {
 			return err
 		}
 		cs.String = rawString
+		cs.Valid = true
 	default:
 		return fmt.Errorf("failed to scan type %+v for value", reflect.TypeOf(value))
 	}
@@ -120,12 +131,14 @@ func (cb *CryptBytes) Scan(value interface{}) error {
 			return err
 		}
 		cb.Bytes = rawBytes
+		cb.Valid = true
 	case []byte:
 		rawBytes, err := DecryptBytes(v)
 		if err != nil {
 			return err
 		}
 		cb.Bytes = rawBytes
+		cb.Valid = true
 	default:
 		return fmt.Errorf("failed to scan type %+v for value", reflect.TypeOf(value))
 	}
